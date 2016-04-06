@@ -104,9 +104,13 @@ var lowgaps = [
 	{ chance: 0.1, nonce: -1 },
 	{ chance: 0.15, nonce: -1 },
 	{ chance: 0.2, nonce: -1 },
+	{ chance: 0.25, nonce: -1 },
 	{ chance: 0.3, nonce: -1 },
+	{ chance: 0.4, nonce: -1 },
 	{ chance: 0.5, nonce: -1 },
+	{ chance: 0.75, nonce: -1 },
 	{ chance: 1.0, nonce: -1 },
+	{ chance: 1.5, nonce: -1 },
 	{ chance: 2.0, nonce: -1 },
 	{ chance: 5.0, nonce: -1 },
 	{ chance: 10.0, nonce: -1 },
@@ -134,9 +138,13 @@ var highgaps = [
 	{ chance: 0.1, nonce: -1 },
 	{ chance: 0.15, nonce: -1 },
 	{ chance: 0.2, nonce: -1 },
+	{ chance: 0.25, nonce: -1 },
 	{ chance: 0.3, nonce: -1 },
+	{ chance: 0.4, nonce: -1 },
 	{ chance: 0.5, nonce: -1 },
+	{ chance: 0.75, nonce: -1 },
 	{ chance: 1.0, nonce: -1 },
+	{ chance: 1.5, nonce: -1 },
 	{ chance: 2.0, nonce: -1 },
 	{ chance: 5.0, nonce: -1 },
 	{ chance: 10.0, nonce: -1 },
@@ -291,7 +299,7 @@ function updategaps(nonce, roll) {
 	}
 
 	for(var i = 0; i < highgaps.length; ++i) {
-		if(roll > 99.99-highgaps[i].chance)
+		if(roll > (9999-Math.round(highgaps[i].chance*100))/100)
 			highgaps[i].nonce = nonce;
 	}
 }
@@ -303,12 +311,16 @@ function gethighgapscore(gaps, nonce, minchance, maxchance) {
 	
 	minchance = minchance || 0.01;
 	maxchance = maxchance || 98.0;
-	
+
+	minchance = Math.round(minchance*100)/100;
+	maxchance = Math.round(maxchance*100)/100;
+
 	for(var i = 0; i < gaps.length; ++i) {
-		score = 0;
+		score = 0.0;
 		if(gaps[i].nonce >= 0) {
 			if(gaps[i].chance >= minchance && gaps[i].chance <= maxchance) {
 				score = (nonce-gaps[i].nonce)*gaps[i].chance/100;
+				score = Math.round(score*1e5)/1e5;
 				if(score > highscore) {
 					highscore = score;
 					highgapidx = i;
@@ -320,6 +332,42 @@ function gethighgapscore(gaps, nonce, minchance, maxchance) {
 	var gap = null;
 	if(highgapidx >= 0) {
 		gap = gaps[highgapidx];
+		return { chance: gap.chance, score: highscore };
+	}
+	
+	return { chance: 0, score: 0 };
+}
+
+function getlowestgapofscore(gaps, nonce, minchance, maxchance, minscore) {
+	var gapidx = -1;
+	var score = 0.0;
+	var highscore = 0.0;
+	
+	minchance = minchance || 0.01;
+	maxchance = maxchance || 98.0;
+
+	minchance = Math.round(minchance*100)/100;
+	maxchance = Math.round(maxchance*100)/100;
+	
+	for(var i = gaps.length-1; i > 0; --i) {
+		score = 0.0;
+		if(gaps[i].nonce >= 0) {
+			if(gaps[i].chance >= minchance && gaps[i].chance <= maxchance) {
+				score = (nonce-gaps[i].nonce)*gaps[i].chance/100;
+				score = Math.round(score*1e5)/1e5;
+				if(score > minscore) {
+					highscore = score;
+					gapidx = i;
+				}
+			}
+		}
+	}
+
+	var gap = null;
+	if(gapidx >= 0) {
+		gap = gaps[gapidx];
+		//console.log(gap.chance, highscore)
+
 		return { chance: gap.chance, score: highscore };
 	}
 	
@@ -530,9 +578,11 @@ var currvgap = null;
 
 var mode2first = false;
 
-var levels = [ 0.02, 0.05, 0.1, 0.2, 0.5, 1.0 ];
-var currlevel = 0;
+var levels = [ 0.03, 0.05, 0.1, 0.2, 0.5, 1.0 ];
+var currlevel = 1;
 var maxlevel = levels.length;
+
+var lastamount = amount;
 
 function rebet() {
 	if(beterr || betres == null) {
@@ -604,10 +654,29 @@ function rebet() {
 	highvgap = gethighgapscore(highgaps, betres.nonce, 0.01, levels[currlevel]);
 	var ishighv = false;
 	if(lowvgap.chance > 0 || highvgap.chance > 0) {
-		if(lowvgap.score < highvgap.score)
-			ishighv = true;
-		else
+		if(lowvgap.score > highvgap.score)
 			ishighv = false;
+		else
+			ishighv = true;
+	}
+
+	if(!vgap.vgap) {
+		if(ishighv) {
+			vgap.vgap = highvgap;
+			vgap.islow = false;
+		} else {
+			vgap.vgap = lowvgap;
+			vgap.islow = true;
+		}
+		if(first && vgap.vgap.chance < profile.minchance) {
+			vgap.vgap.chance = profile.minchance;
+			if(vgap.islow && profile.condition == '>')
+				vgap.islow = false;
+			else if(!vgap.islow && profile.confition == '<')
+				vgap.islow = true;
+			onswitch = true;
+		}
+		//console.log(lowvgap, highvgap, vgap, levels, currlevel)
 	}
 	
 	if(lastwon) {
@@ -629,7 +698,7 @@ function rebet() {
 				((rolltarget.condition == '>' && lastroll > 99.99-profile.minchance) || 
 					(condition == '<' && lastroll < profile.minchance))) {
 			profile.minchance = 0.01;
-			if(lowvgap.chance > 0 || highvgap.chance > 0) {
+			if(lowvgap.chance > 0 && highvgap.chance > 0) {
 				if (ishighv) {
 					vgap.islow = false;
 					vgap.vgap = highvgap;
@@ -691,42 +760,65 @@ function rebet() {
 			currlevel = maxlevel-1;
 
 		if(!onswitch && profile.mode2) {
-			if(vgap.vgap) {
+			if(vgap.vgap && vgap.vgap.chance > 0) {
+				//console.log(1, vgap)
 				if(vgap.islow) {
-					vgap.vgap = gethighgapscore(lowgaps, betres.nonce, vgap.vgap.chance, vgap.vgap.chance);
+					vgap.vgap = gethighgapscore(lowgaps, betres.nonce, 0.01, vgap.vgap.chance);
 				} else {
-					vgap.vgap = gethighgapscore(highgaps, betres.nonce, vgap.vgap.chance, vgap.vgap.chance);
+					vgap.vgap = gethighgapscore(highgaps, betres.nonce, 0.01, vgap.vgap.chance);
 				}
 				profile.minchance = vgap.vgap.chance;
 			}
-			lowvgap = gethighgapscore(lowgaps, betres.nonce, 0.01, levels[currlevel]);
-			highvgap = gethighgapscore(highgaps, betres.nonce, 0.01, levels[currlevel]);
-			if(lowvgap.chance > 0 || highvgap.chance > 0) {
-				if(lowvgap.score < highvgap.score)
-						ishighv = true;
-					else
-						ishighv = false;
+
+			var max = maxlevel-1;
+			var extralevel = 0;
+			if(currlevel > 1 && currlevel+1 < max) {
+				extralevel = 1;
 			}
 
-			if(chance <= 1.0 && vgap.vgap && (lowvgap.chance > 0 && highvgap.chance > 0) && 
-					(lowvgap.score-2 > vgap.vgap.score || highvgap.score-2 > vgap.vgap.score)) {
+			var scoreneeded = 0.0;
+			if(vgap.vgap.chance < 0.05)
+				scoreneeded = 1.0;
+			else
+				scoreneeded = 2.0;
+
+			var switchlowvgap = getlowestgapofscore(lowgaps, betres.nonce, 0.01, levels[currlevel+extralevel], vgap.vgap.score+scoreneeded);
+			var switchhighvgap = getlowestgapofscore(highgaps, betres.nonce, 0.01, levels[currlevel+extralevel], vgap.vgap.score+scoreneeded);
+
+			if((vgap.vgap.score > 0 && switchlowvgap.chance > 0 && switchlowvgap.score > 0) ||  
+					(switchhighvgap.chance > 0 && switchhighvgap.score > 0)) {
+				if(switchlowvgap.score > switchhighvgap.score)
+						ishighv = false;
+					else
+						ishighv = true;
+			}
+			if(chance <= 1.0 && vgap && vgap.vgap && vgap.vgap.chance > 0 && 
+					(switchlowvgap.chance > 0 || switchhighvgap.chance > 0) && 
+					(vgap.vgap.chance < 0.05 && 
+							(switchlowvgap.score-1 > vgap.vgap.score || 
+							switchhighvgap.score-1 > vgap.vgap.score)) ||
+					(vgap.vgap.chance >= 0.05 && 
+							(switchlowvgap.score-2 > vgap.vgap.score || 
+							switchhighvgap.score-2 > vgap.vgap.score))) {
+				console.log(vgap, switchlowvgap, switchhighvgap)
+
 				if (ishighv) {
 					condition = '>';
-					chance = highvgap.chance;
+					chance = switchhighvgap.chance;
 					vgap.islow = false;
-					vgap.vgap = highvgap;
+					vgap.vgap = switchhighvgap;
 				} else {
 					condition = '<';
-					chance = lowvgap.chance;
+					chance = switchlowvgap.chance;
 					vgap.islow = true;
-					vgap.vgap = lowvgap;
+					vgap.vgap = switchlowvgap;
 				}
-				currlevel++;
+				currlevel += 1+extralevel;
 				if(currlevel >= maxlevel)
 					currlevel = maxlevel-1;
 
 				profile.minchance = chance;
-				console.log(vgap);
+				//console.log(vgap);
 			} else {
 				var minchance = profile.minchance;
 				var maxchance = profile.maxchance;
@@ -734,7 +826,7 @@ function rebet() {
 				if((profile.mode2zig && mode2zigpaydirup) || !profile.mode2zig) {
 					if(!mode2first) {
 						while(chance >= minchance && getpayout(chance) <= currpayout+1) {
-							chance -= 1.0;
+							chance -= 2.0;
 						}
 						if(chance <= minchance+0.001) {
 							chance = minchance;
@@ -744,7 +836,7 @@ function rebet() {
 						}
 					}
 					if(mode2first) {
-						chance = 90;
+						chance = 75;
 						mode2first = false;
 					}
 				} else if(profile.mode2zig && !mode2zigpaydirup) {
@@ -768,6 +860,11 @@ function rebet() {
 			}
 		}
 	}
+
+	if(betres.nonce % 1000 == 0)
+		console.log(lowgaps, highgaps)
+	if(betres.nonce % 100 == 0)
+		console.log(vgap, lowvgap, highvgap)
 
 	if(!betres.won && (profile.stoplossenabled && balance >= 50001 && losestreakcost > profile.maxstreakcost)) {
 		if(!((condition == '<' && target <= 0.1) || (condition == '>' && target > 99.88))) {
@@ -878,11 +975,15 @@ function rebet() {
 	
 	totalbet += amount;
 
-	if(amount > 10000)
-		waittime = 200;
+	if(amount > 10000 && lastamount > 10000)
+		waittime = 50;
+	else if(amount < 10000 && lastamount > 10000)
+		waittime = 750;
 	else
 		waittime = 350;
 
+	lastamount = amount;
+	
 	betres = null;
 	beterr = true;
 	needle.post(url + '/bet?access_token=' + token, { 
