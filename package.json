@@ -1,0 +1,22 @@
+{
+  "name": "pricedice-headless",
+  "version": "0.1.0",
+  "description": "Simple CLI bot for PrimeDice.com",
+  "main": "primedice.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/CryptoCurrencyStuff/pricedice-headless.git"
+  },
+  "keywords": [
+    "bitcoin",
+    "primedice"
+  ],
+  "author": "UnixPunk",
+  "license": "BSD-2-Clause",
+  "bugs": {
+    "url": "https://github.com/CryptoCurrencyStuff/pricedice-headless/issues"
+  }
+}
