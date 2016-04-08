@@ -1,20 +1,6 @@
 "use strict";
 
-function random(howMany, chars) {
-    chars = chars 
-		|| "abcdefghijklmnopqrstuwxyzABCDEFGHIJKLMNOPQRSTUWXYZ0123456789";
-    var rnd = crypto.randomBytes(howMany), 
-		value = new Array(howMany), 
-		len = chars.length;
-
-    for (var i = 0; i < howMany; i++)
-        value[i] = chars[rnd[i] % len]
-
-    return value.join('');
-}
-
 var needle = require('needle');
-var sleep = require('sleep');
 var prompt = require('sync-prompt').prompt;
 
 var options = {
@@ -92,71 +78,71 @@ var profiles = [
 var profile = profiles[2];
 
 var lowgaps = [
-	{ chance: 0.01, nonce: -1 },
-	{ chance: 0.02, nonce: -1 },
-	{ chance: 0.03, nonce: -1 },
-	{ chance: 0.04, nonce: -1 },
-	{ chance: 0.05, nonce: -1 },
-	{ chance: 0.06, nonce: -1 },
-	{ chance: 0.07, nonce: -1 },
-	{ chance: 0.08, nonce: -1 },
-	{ chance: 0.09, nonce: -1 },
-	{ chance: 0.1, nonce: -1 },
-	{ chance: 0.15, nonce: -1 },
-	{ chance: 0.2, nonce: -1 },
-	{ chance: 0.25, nonce: -1 },
-	{ chance: 0.3, nonce: -1 },
-	{ chance: 0.4, nonce: -1 },
-	{ chance: 0.5, nonce: -1 },
-	{ chance: 0.75, nonce: -1 },
-	{ chance: 1.0, nonce: -1 },
-	{ chance: 1.5, nonce: -1 },
-	{ chance: 2.0, nonce: -1 },
-	{ chance: 5.0, nonce: -1 },
-	{ chance: 10.0, nonce: -1 },
-	{ chance: 20.0, nonce: -1 },
-	{ chance: 30.0, nonce: -1 },
-	{ chance: 40.0, nonce: -1 },
-	{ chance: 49.0, nonce: -1 },
-	{ chance: 60.0, nonce: -1 },
-	{ chance: 70.0, nonce: -1 },
-	{ chance: 80.0, nonce: -1 },
-	{ chance: 90.0, nonce: -1 },
-	{ chance: 95.0, nonce: -1 }
+	{ chance: 0.01, nonce: -1, score: 0 },
+	{ chance: 0.02, nonce: -1, score: 0 },
+	{ chance: 0.03, nonce: -1, score: 0 },
+	{ chance: 0.04, nonce: -1, score: 0 },
+	{ chance: 0.05, nonce: -1, score: 0 },
+	{ chance: 0.06, nonce: -1, score: 0 },
+	{ chance: 0.07, nonce: -1, score: 0 },
+	{ chance: 0.08, nonce: -1, score: 0 },
+	{ chance: 0.09, nonce: -1, score: 0 },
+	{ chance: 0.1, nonce: -1, score: 0 },
+	{ chance: 0.15, nonce: -1, score: 0 },
+	{ chance: 0.2, nonce: -1, score: 0 },
+	{ chance: 0.25, nonce: -1, score: 0 },
+	{ chance: 0.3, nonce: -1, score: 0 },
+	{ chance: 0.4, nonce: -1, score: 0 },
+	{ chance: 0.5, nonce: -1, score: 0 },
+	{ chance: 0.75, nonce: -1, score: 0 },
+	{ chance: 1.0, nonce: -1, score: 0 },
+	{ chance: 1.5, nonce: -1, score: 0 },
+	{ chance: 2.0, nonce: -1, score: 0 },
+	{ chance: 5.0, nonce: -1, score: 0 },
+	{ chance: 10.0, nonce: -1, score: 0 },
+	{ chance: 20.0, nonce: -1, score: 0 },
+	{ chance: 30.0, nonce: -1, score: 0 },
+	{ chance: 40.0, nonce: -1, score: 0 },
+	{ chance: 49.0, nonce: -1, score: 0 },
+	{ chance: 60.0, nonce: -1, score: 0 },
+	{ chance: 70.0, nonce: -1, score: 0 },
+	{ chance: 80.0, nonce: -1, score: 0 },
+	{ chance: 90.0, nonce: -1, score: 0 },
+	{ chance: 95.0, nonce: -1, score: 0 }
 ];
 
 var highgaps = [
-	{ chance: 0.01, nonce: -1 },
-	{ chance: 0.02, nonce: -1 },
-	{ chance: 0.03, nonce: -1 },
-	{ chance: 0.04, nonce: -1 },
-	{ chance: 0.05, nonce: -1 },
-	{ chance: 0.06, nonce: -1 },
-	{ chance: 0.07, nonce: -1 },
-	{ chance: 0.08, nonce: -1 },
-	{ chance: 0.09, nonce: -1 },
-	{ chance: 0.1, nonce: -1 },
-	{ chance: 0.15, nonce: -1 },
-	{ chance: 0.2, nonce: -1 },
-	{ chance: 0.25, nonce: -1 },
-	{ chance: 0.3, nonce: -1 },
-	{ chance: 0.4, nonce: -1 },
-	{ chance: 0.5, nonce: -1 },
-	{ chance: 0.75, nonce: -1 },
-	{ chance: 1.0, nonce: -1 },
-	{ chance: 1.5, nonce: -1 },
-	{ chance: 2.0, nonce: -1 },
-	{ chance: 5.0, nonce: -1 },
-	{ chance: 10.0, nonce: -1 },
-	{ chance: 20.0, nonce: -1 },
-	{ chance: 30.0, nonce: -1 },
-	{ chance: 40.0, nonce: -1 },
-	{ chance: 49.0, nonce: -1 },
-	{ chance: 60.0, nonce: -1 },
-	{ chance: 70.0, nonce: -1 },
-	{ chance: 80.0, nonce: -1 },
-	{ chance: 90.0, nonce: -1 },
-	{ chance: 95.0, nonce: -1 }
+	{ chance: 0.01, nonce: -1, score: 0 },
+	{ chance: 0.02, nonce: -1, score: 0 },
+	{ chance: 0.03, nonce: -1, score: 0 },
+	{ chance: 0.04, nonce: -1, score: 0 },
+	{ chance: 0.05, nonce: -1, score: 0 },
+	{ chance: 0.06, nonce: -1, score: 0 },
+	{ chance: 0.07, nonce: -1, score: 0 },
+	{ chance: 0.08, nonce: -1, score: 0 },
+	{ chance: 0.09, nonce: -1, score: 0 },
+	{ chance: 0.1, nonce: -1, score: 0 },
+	{ chance: 0.15, nonce: -1, score: 0 },
+	{ chance: 0.2, nonce: -1, score: 0 },
+	{ chance: 0.25, nonce: -1, score: 0 },
+	{ chance: 0.3, nonce: -1, score: 0 },
+	{ chance: 0.4, nonce: -1, score: 0 },
+	{ chance: 0.5, nonce: -1, score: 0 },
+	{ chance: 0.75, nonce: -1, score: 0 },
+	{ chance: 1.0, nonce: -1, score: 0 },
+	{ chance: 1.5, nonce: -1, score: 0 },
+	{ chance: 2.0, nonce: -1, score: 0 },
+	{ chance: 5.0, nonce: -1, score: 0 },
+	{ chance: 10.0, nonce: -1, score: 0 },
+	{ chance: 20.0, nonce: -1, score: 0 },
+	{ chance: 30.0, nonce: -1, score: 0 },
+	{ chance: 40.0, nonce: -1, score: 0 },
+	{ chance: 49.0, nonce: -1, score: 0 },
+	{ chance: 60.0, nonce: -1, score: 0 },
+	{ chance: 70.0, nonce: -1, score: 0 },
+	{ chance: 80.0, nonce: -1, score: 0 },
+	{ chance: 90.0, nonce: -1, score: 0 },
+	{ chance: 95.0, nonce: -1, score: 0 }
 ];
 
 var username = profile.username; 
@@ -184,8 +170,6 @@ var losestreak = 0;
 var losestreakcost = profile.cost;
 
 var amount = getwagerforprofit(getchance(profile.target), profile.cost, profile.amount, profile.stepped);
-console.log(getchance(profile.target), profile.cost, profile.amount);
-//var streakcost = amount;
 
 var lasttarget = 0;
 var lastroll = 0.0;
@@ -205,6 +189,19 @@ var losses = 0;
 var wins = 0;
 
 var first = true;
+
+function random(howMany, chars) {
+    chars = chars 
+		|| "abcdefghijklmnopqrstuwxyzABCDEFGHIJKLMNOPQRSTUWXYZ0123456789";
+    var rnd = crypto.randomBytes(howMany), 
+		value = new Array(howMany), 
+		len = chars.length;
+
+    for (var i = 0; i < howMany; i++)
+        value[i] = chars[rnd[i] % len]
+
+    return value.join('');
+}
 
 function login() {
 	var chunk;
@@ -297,15 +294,30 @@ function updategaps(nonce, roll) {
 		if(roll < lowgaps[i].chance)
 			lowgaps[i].nonce = nonce;
 	}
+	computegapscores(lowgaps, nonce);
 
 	for(var i = 0; i < highgaps.length; ++i) {
 		if(roll > (9999-Math.round(highgaps[i].chance*100))/100)
 			highgaps[i].nonce = nonce;
 	}
+	computegapscores(highgaps, nonce);
+}
+
+function computegapscores(gaps, nonce) {
+	var score;
+	
+	for(var i = 0; i < gaps.length; ++i) {
+		score = 0.0;
+		if(gaps[i].nonce >= 0) {
+			score = (nonce-gaps[i].nonce)*gaps[i].chance/100;
+			score = Math.round(score*1e5)/1e5;
+			gaps[i].score = score;
+		}
+	}
 }
 
 function gethighgapscore(gaps, nonce, minchance, maxchance) {
-	var highgapidx = -1;
+	var gapidx = -1;
 	var highscore = 0.0;
 	var score = 0.0;
 	
@@ -319,19 +331,18 @@ function gethighgapscore(gaps, nonce, minchance, maxchance) {
 		score = 0.0;
 		if(gaps[i].nonce >= 0) {
 			if(gaps[i].chance >= minchance && gaps[i].chance <= maxchance) {
-				score = (nonce-gaps[i].nonce)*gaps[i].chance/100;
-				score = Math.round(score*1e5)/1e5;
+				score = gaps[i].score;
 				if(score > highscore) {
 					highscore = score;
-					highgapidx = i;
+					gapidx = i;
 				}
 			}
 		}
 	}
 
 	var gap = null;
-	if(highgapidx >= 0) {
-		gap = gaps[highgapidx];
+	if(gapidx >= 0) {
+		gap = gaps[gapidx];
 		return { chance: gap.chance, score: highscore };
 	}
 	
@@ -353,8 +364,7 @@ function getlowestgapofscore(gaps, nonce, minchance, maxchance, minscore) {
 		score = 0.0;
 		if(gaps[i].nonce >= 0) {
 			if(gaps[i].chance >= minchance && gaps[i].chance <= maxchance) {
-				score = (nonce-gaps[i].nonce)*gaps[i].chance/100;
-				score = Math.round(score*1e5)/1e5;
+				score = gaps[i].score;
 				if(score > minscore) {
 					highscore = score;
 					gapidx = i;
@@ -690,7 +700,7 @@ function rebet() {
 			else
 				condition = '<';
 
-			target = getRandom(profile.mintarget, profile.maxtarget);
+			target = getRandom(profile.minchance, profile.maxchance);
 			if(condition == '<')
 				target = 99.99-target;
 			target = Math.floor(roundtoprecision(target, 2));
@@ -794,10 +804,10 @@ function rebet() {
 			}
 			if(chance <= 1.0 && vgap && vgap.vgap && vgap.vgap.chance > 0 && 
 					(switchlowvgap.chance > 0 || switchhighvgap.chance > 0) && 
-					(vgap.vgap.chance < 0.05 && 
+					(vgap.vgap.chance <= 0.05 && 
 							(switchlowvgap.score-1 > vgap.vgap.score || 
 							switchhighvgap.score-1 > vgap.vgap.score)) ||
-					(vgap.vgap.chance >= 0.05 && 
+					(vgap.vgap.chance > 0.05 && 
 							(switchlowvgap.score-2 > vgap.vgap.score || 
 							switchhighvgap.score-2 > vgap.vgap.score))) {
 				console.log(vgap, switchlowvgap, switchhighvgap)
@@ -825,10 +835,17 @@ function rebet() {
 
 				if((profile.mode2zig && mode2zigpaydirup) || !profile.mode2zig) {
 					if(!mode2first) {
-						while(chance >= minchance && getpayout(chance) <= currpayout+1) {
-							chance -= 2.0;
+						if(chance == 75) {
+							chance = 49;
+						} else {
+							while(chance > minchance && getpayout(chance) <= currpayout+1) {
+								chance -= 2.0;
+								chance = Math.round(chance*100)/100;
+							}
+							
 						}
-						if(chance <= minchance+0.001) {
+
+						if(chance < minchance) {
 							chance = minchance;
 							if(profile.mode2zig)
 								mode2zigpaydirup = false;
@@ -849,7 +866,6 @@ function rebet() {
 				}
 			}
 
-			//chance = roundtoprecision(chance, 2);
 			//console.log(chance, minchance, maxchance);
 			currpayout = getpayout(chance);
 
