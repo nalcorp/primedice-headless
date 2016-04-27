@@ -3,6 +3,6 @@
 ## Installation
 
 ### Requirements
-* NodeJS
+* NodeJS >= 4.x
 * `npm install needle`
-* `npm install sync-prompt`
+* `npm install prompt-sync`
