@@ -1,13 +1,13 @@
 "use strict";
 
 var needle = require('needle');
-var prompt = require('sync-prompt').prompt;
+var prompt = require('prompt-sync')();
 
 var options = {
   compressed: 			true, 
   follow_max: 			5,
   rejectUnauthorized: 	true, 
-  timeout: 				20000, 
+  timeout: 				325000, 
   user_agent: 			'ChaosBot/0.2.1',
   follow_set_cookies: 	true
 }
@@ -20,7 +20,7 @@ function onErr(err) {
 	console.log(err);
 	return 1;
 }
-  
+
 var profiles = [
 	{
 		target: 98,
@@ -211,11 +211,12 @@ function login() {
 }
 
 function loginend() {
-	needle.get(url + '/users/1?access_token=' + token).on('readable', getownuserinfo).on('end', getownuserinfoend);
+	needle.get(url + '/users/1?access_token=' + token, { parse: true }).on('readable', getownuserinfo).on('end', getownuserinfoend);
 
 	var interval = setInterval(
 		function() {
 			if(gotownuserinfo) {
+				console.log('auth success');
 				balance = ownuserinfo.balance;
 				startbalance = balance;
 				clearInterval(interval);
@@ -225,7 +226,7 @@ function loginend() {
 
 					amount = 0;
 					needle.get(url + '/users/1?access_token=' + token).on('readable', getownuserinfo).on('end', getownuserinfoend);
-					setTimeout(betend, 20000);
+					setTimeout(loginend, 20000);
 					return;
 				}
 
@@ -250,22 +251,16 @@ function bankend() {
 
 var beterr = false;
 
-function bet() {
+function bet(error, res) {
 	betres = null;
 
-	var res;
-	var chunk;
-	while (chunk = this.read())
-		res = chunk;
-
-	if(typeof(res.user) != 'undefined') {
-		betres = res.bet;
-		balance = res.user.balance;
-			
-		beterr = false;
-	} else {
-		console.log('error, retrying bet');
+	if(error) {
+		console.log('error, retrying bet', error);
 		beterr = true;
+	} else if(res && typeof(res.body.user) != 'undefined') {
+		betres = res.body.bet;
+		balance = res.body.user.balance;
+		beterr = false;
 	}
 	
 	if(betres == null)
@@ -278,9 +273,9 @@ function bet() {
 	else
 		lastbetid = 0;
 
-	if(beterr)
-		console.log(res.toString())
+	betend();
 }
+
 
 var green = [ "\x1b[1;32m", "\x1b[0m" ];
 var red = [ "\x1b[1;31m", "\x1b[0m" ];
@@ -430,7 +425,6 @@ function betend() {
 			balance -= bankamount;
 			startbalance = balance;
 			needle.post(url + '/tip?access_token=' + token, {username: bankuser, amount: bankamount}).on('readable', bank).on('end', bankend);
-			//bankat += 200000;
 		}
 		lastbetid = 0;
 		if (first) {
@@ -495,11 +489,8 @@ function getpayout(chance) {
 }
 
 function getwagerforprofit(chance, streakCost, minprofit, stepped) {
-	if(streakCost < 0.)
-		streakCost = 0.;
-
-	if(minprofit < 0.0001)
-		minprofit = 0.0001;
+	streakCost = streakCost < 0 ? 0 : streakCost;
+	minprofit = minprofit < 0.0001 ? 0.0001 : minprofit;
 
 	var payout = getpayout(chance);
 	var wager = 1.;
@@ -588,7 +579,7 @@ var currvgap = null;
 
 var mode2first = false;
 
-var levels = [ 0.03, 0.05, 0.1, 0.2, 0.5, 1.0 ];
+var levels = [ 0.02, 0.05, 0.1, 0.2, 0.5, 1.0 ];
 var currlevel = 1;
 var maxlevel = levels.length;
 
@@ -600,7 +591,7 @@ function rebet() {
 			amount: amount, 
 			target: target, 
 			condition: condition 
-		}).on('readable', bet).on('end', betend);
+		}, {parse: true}, bet);
 		return;
 	}
 
@@ -613,7 +604,6 @@ function rebet() {
 		amount = 0;
 		needle.get(url + '/users/1?access_token=' + token).on('readable', getownuserinfo).on('end', getownuserinfoend);
 		setTimeout(betend, 15000);
-
 		return;
 	}
 
@@ -786,11 +776,11 @@ function rebet() {
 				extralevel = 1;
 			}
 
-			var scoreneeded = 0.0;
-			if(vgap.vgap.chance < 0.05)
-				scoreneeded = 1.0;
-			else
-				scoreneeded = 2.0;
+			//var scoreneeded = 0.0;
+			//if(vgap.vgap.chance < 0.05)
+			//	scoreneeded = 1.0;
+			//else
+			var scoreneeded = 2.0;
 
 			var switchlowvgap = getlowestgapofscore(lowgaps, betres.nonce, 0.01, levels[currlevel+extralevel], vgap.vgap.score+scoreneeded);
 			var switchhighvgap = getlowestgapofscore(highgaps, betres.nonce, 0.01, levels[currlevel+extralevel], vgap.vgap.score+scoreneeded);
@@ -805,11 +795,11 @@ function rebet() {
 			if(chance <= 1.0 && vgap && vgap.vgap && vgap.vgap.chance > 0 && 
 					(switchlowvgap.chance > 0 || switchhighvgap.chance > 0) && 
 					(vgap.vgap.chance <= 0.05 && 
-							(switchlowvgap.score-1 > vgap.vgap.score || 
-							switchhighvgap.score-1 > vgap.vgap.score)) ||
+							(switchlowvgap.score > vgap.vgap.score+2 || 
+							switchhighvgap.score > vgap.vgap.score+2)) ||
 					(vgap.vgap.chance > 0.05 && 
-							(switchlowvgap.score-2 > vgap.vgap.score || 
-							switchhighvgap.score-2 > vgap.vgap.score))) {
+							(switchlowvgap.score > vgap.vgap.score+2 || 
+							switchhighvgap.score > vgap.vgap.score+2))) {
 				console.log(vgap, switchlowvgap, switchhighvgap)
 
 				if (ishighv) {
@@ -849,7 +839,6 @@ function rebet() {
 							chance = minchance;
 							if(profile.mode2zig)
 								mode2zigpaydirup = false;
-							//console.log(chance, minchance, maxchance);
 						}
 					}
 					if(mode2first) {
@@ -859,6 +848,7 @@ function rebet() {
 				} else if(profile.mode2zig && !mode2zigpaydirup) {
 					while(chance < 0.1 && getpayout(chance) > currpayout-1) {
 						chance += 0.01;
+						chance = Math.round(chance*100)/100;
 					}
 					if(chance >= maxchance) {
 						mode2zigpaydirup = true;
@@ -877,7 +867,7 @@ function rebet() {
 		}
 	}
 
-	if(betres.nonce % 1000 == 0)
+	if(betres.nonce % 500 == 0)
 		console.log(lowgaps, highgaps)
 	if(betres.nonce % 100 == 0)
 		console.log(vgap, lowvgap, highvgap)
@@ -895,9 +885,9 @@ function rebet() {
 	if(!onswitch && highgap && lowgap && 
 			(((lasthighscore.score > 4 && lastlowscore.score > 4) && 
 				(lowgap.score == 0 || highgap.score == 0)) || 
-				(highgap.chance <= 2.0 && highgap.score > 8) || 
-				(lowgap.chance <= 2.0 && lowgap.score > 8) || 
-				highgap.score > 10 || lowgap.score > 10)) {
+				(highgap.chance <= 2.0 && highgap.score > 10) || 
+				(lowgap.chance <= 2.0 && lowgap.score > 10) || 
+				highgap.score > 12.5 || lowgap.score > 12.5)) {
 		var ishigh = highgap.score > lowgap.score;
 		var tvar = null;
 		if(ishigh) {
@@ -994,7 +984,7 @@ function rebet() {
 	if(amount > 10000 && lastamount > 10000)
 		waittime = 50;
 	else if(amount < 10000 && lastamount > 10000)
-		waittime = 750;
+		waittime = 800;
 	else
 		waittime = 350;
 
@@ -1004,8 +994,9 @@ function rebet() {
 	beterr = true;
 	needle.post(url + '/bet?access_token=' + token, { 
 		amount: amount, target: target, condition: condition 
-	}).on('readable', bet).on('end', betend);
+	}, {parse: true}, bet);
 }
+
 function getuserinfo(name) {
 	//console.log(name)
 	return needle.get(url + '/users/:' + name);
@@ -1013,9 +1004,9 @@ function getuserinfo(name) {
 
 function getownuserinfo() {
 	var chunk;
+	var res;
 	while (chunk = this.read())
-		ownuserinfo = chunk.user;
-	console.log(chunk)
+		ownuserinfo = chunk;
 }
 
 function getownuserinfoend() {
