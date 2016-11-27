@@ -1,3 +1,15 @@
+/*
+ * ----------------------------------------------------------------------------
+ * "THE BEER-WARE LICENSE" (Revision 43-UnixPunk):
+ * Poul-Henning Kamp <phk@FreeBSD.ORG> wrote this license.
+ * UnixPunk wrote this script and tweaked the license wording.
+ * As long as you retain this notice you can do whatever you want with this 
+ * stuff as long as you don't sell it for profit. If we meet some day, and you 
+ * think this stuff is worth it, you can buy me a beer in return or donate some 
+ * bitcoin to 16EtDFbhbkV8MqHhup5REAdhs73PeDfjUW (UnixPunk) 
+ * ----------------------------------------------------------------------------
+ */
+
 "use strict";
 
 var needle = require('needle');
