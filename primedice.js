@@ -100,6 +100,10 @@ var profiles = [
 
 var profile = profiles[0];
 
+var want_high_variance_prompt = true;
+var auto_switch_high_variance = false;
+var ping_estimate = 50;
+
 var lowgaps = [
 	{ chance: 0.01, nonce: -1, score: 0 },
 	{ chance: 0.02, nonce: -1, score: 0 },
@@ -280,9 +284,6 @@ var auth_str = profile.apikey != '' ? 'api_key=' + profile.apikey : 'access_toke
 var ownuserinfo;
 var betres;
 
-var waittimemin = 300;
-var waittimemax = 350;
-
 var bankamountmin = 50001;
 var bankat = 150000000;
 var bankuser = profile.bankuser;
@@ -298,6 +299,12 @@ var amount = profile.amount;
 if(amount > 0 || profile.cost > 0)
     amount = getwagerforprofit(getchance(profile.target), profile.cost, profile.amount, profile.stepped);
 losestreakcost += amount;
+
+function pad(num, size) {
+    var s = num+"";
+    while (s.length < size) s = "0" + s;
+    return s;
+}
 
 function random(howMany, chars) {
     chars = chars 
@@ -326,7 +333,7 @@ function loginend() {
 				if(balance < 1) {
 					console.log("Balance is less than 1 satoshi, waiting for funds... ");
 
-					amount = 0;
+					//amount = 0;
 					needle.get(url + '/users/1?' + auth_str).on('readable', getownuserinfo).on('end', getownuserinfoend);
 					setTimeout(loginend, 20000);
 					return;
@@ -335,7 +342,7 @@ function loginend() {
 				rebet()
 			}
 		}
-	, 300);
+	, 1000);
 }
 
 function bank() {
@@ -345,7 +352,6 @@ function bank() {
 
 	console.log(JSON.stringify(chunk));
 	maxbalance = balance = res.user.balance;
-
 }
 
 function bankend() {
@@ -354,8 +360,7 @@ function bankend() {
 var beterr = false;
 
 function bet(error, res) {
-	betres = null;
-
+	var timeout = 250;
 	if(error) {
 		console.log('error, retrying bet', error);
 		beterr = true;
@@ -365,6 +370,9 @@ function bet(error, res) {
 		beterr = false;
 	} else {
 		beterr = true;
+		if (res.body.match(/Too many requests/) === null) {
+			timeout = 10000;
+		}
 		console.log('err:', res.body);
 	}
 	
@@ -376,12 +384,19 @@ function bet(error, res) {
 	else
 		lastbetid = 0;
 
+	if (beterr) {
+		setTimeout(rebet, timeout);
+		return;
+	}
+
 	betend();
 }
 
-
-var green = [ "\x1b[1;32m", "\x1b[0m" ];
-var red = [ "\x1b[1;31m", "\x1b[0m" ];
+var ansi_seq_end = '\x1b[0m';
+var pink = [ '\x1b[1;35m', ansi_seq_end ];
+var blue = [ '\x1b[1;34m', ansi_seq_end ];
+var green = [ '\x1b[1;32m', ansi_seq_end ];
+var red = [ '\x1b[1;31m', ansi_seq_end ];
 
 var lastbetid = 0;
 
@@ -485,6 +500,12 @@ function getlowestgapofscore(gaps, nonce, minchance, maxchance, minscore) {
 var lasthighscore = 0, lastlowscore = 0;
 
 function betend() {
+   	if(betres == null) {
+		console.log('betend null res');
+	        setTimeout(rebet, 1000);
+        	return;
+	}
+	
 	if (betres != null) {
 		if (betres.win) {
 			if (losestreak > 0) {
@@ -506,18 +527,36 @@ function betend() {
 		
 		var seqs = [ green, red ];
 		var use = 0;
-		if(betres.win)
-			use = 0;
-		else
+		if (!betres.win)
 			use = 1;
 
-		var profit = (balance + banked - startbalance).toFixed(0);
+		var streak_string = '(';
+		if (betres.win) {
+			streak_string += green[0] + 'W' + winstreak + green[1]; 
+		} else {
+			streak_string += red[0] + 'L' + losestreak + red[1];
+		}
+		streak_string += ')';
+
+		var roll_string = '';
+		if (betres.roll < 1.0 || betres.roll > 99.99-1.0) {
+			roll_string = pink[0] + pad(betres.roll.toFixed(2), 5) + pink[1];
+		} else {
+			roll_string = pad(betres.roll.toFixed(2), 5);
+		}
+		
+		var target_string = pad(betres.target.toFixed(2), 5);
+
 		console.log(profile.username + ' ' + Math.floor(Date.now() / 1000) + 
-			' ' + betres.id + ' ' + betres.nonce + ' ' + Math.floor(balance).toFixed(0) + 
-			'(' + seqs[use][0] + betres.profit.toFixed(0) + seqs[use][1] + ') ' + 
-			betres.condition + betres.target + ' ' + betres.roll + 
-			' bet ' + totalbet.toFixed(0) + 
-			' (' + green[0] + 'W' + winstreak + green[1] + ':' + red[0] + 'L' + losestreak + red[1] + ') cost(' + losestreakcost.toFixed(0) + ')');
+			' ' + betres.id + ' ' + betres.nonce + ' ' +
+			betres.condition + target_string + ' ' +
+			roll_string + ' ' +
+			Math.floor(balance).toFixed(0) + 
+			'(' + seqs[use][0] + betres.profit.toFixed(0) + seqs[use][1] + ') ' +  
+			'bet ' + totalbet.toFixed(0) +  ' ' +
+			streak_string + ' cost(' +
+			(betres.win ? (losestreakcost-betres.amount).toFixed(0) : losestreakcost.toFixed(0)) + ')'
+		);
 
 		if (profile.bankat > 0 && balance >= profile.bankat) {
 			var bankamount = Math.floor(balance);
@@ -530,7 +569,9 @@ function betend() {
 			needle.post(url + '/tip?' + auth_str, {username: bankuser, amount: bankamount, hide: true}).on('readable', bank).on('end', bankend);
 		}
 		lastbetid = 0;
+		
 		if (first) {
+			startbalance = balance;
 			first = false;
 
 			for(var i = 0; i < lowgaps.length; ++i) {
@@ -544,23 +585,15 @@ function betend() {
 		updategaps(betres.nonce, betres.roll);
 	}
 
-    if(betres == null) {
-        setTimeout(rebet, 1000);
-        return;
-	}
-
-	if (last_bet_time > 0 && betres.amount < 10000
-			&& Date.now() < last_bet_time+500)
-		waittime = last_bet_time+500 - Date.now();
-	else
+	if (last_bet_time > 0 && betres.amount < 10000 && Date.now() < last_bet_time+500+ping_estimate) {
+		waittime = last_bet_time+500+ping_estimate - Date.now();
+		if (waittime < 0)
+			waittime = 0;
+	} else {
 		waittime = 0;
-
+	}
     setTimeout(rebet, waittime);
 }
-
-var balancehit = false;
-
-var waiting = true;
 
 var amountsave = 0;
 
@@ -598,12 +631,12 @@ function getwagerforprofit(chance, streakCost, minprofit, stepped) {
 	var payout = getpayout(chance);
 	var wager = 1.;
 
-	while(wager * payout-wager < streakCost + minprofit) {
+	while (wager * payout-wager < streakCost + minprofit) {
 		wager = Math.round(wager*2);
 	}
 
-	if(!stepped) {
-		while(wager > 0 && ((wager-1) * payout)-(wager-1) >= streakCost + minprofit) {
+	if (!stepped) {
+		while (wager > 0 && ((wager-1) * payout)-(wager-1) >= streakCost + minprofit) {
 			wager -= 1;
 		}
 	}
@@ -758,7 +791,6 @@ function getnextmode2chance(curr) {
 	return curr;
 }
 
-var mode2chance = profile.minchance;
 var mode2saveamount = profile.amount;
 
 function rebet() {
@@ -783,7 +815,6 @@ function rebet() {
 		}, bet);
 		return;
 	}
-
 
 	if(balance > 0 && broke) {
 		amount = amountsave;
@@ -829,10 +860,8 @@ function rebet() {
 	if (lastwon) {
 		if (profile.mode2) {
 			profile.minchance = orig_profile_chance;
-			mode2chance = orig_profile_chance;
 		}
 	}
-
 
     lowvgap = gethighgapscore(lowgaps, betres.nonce, 0.01, profile.minchance);
     highvgap = gethighgapscore(highgaps, betres.nonce, 0.01, profile.minchance);
@@ -901,15 +930,6 @@ function rebet() {
 				vgap.vgap = highvgap;
 				profile.minchance = highvgap.chance;
 				condition = '>';
-			} else {
-				vgap.vgap = null;
-				if(condition == '<') {
-					if(lastroll < profile.minchance)
-						condition = '>';
-				} else {
-					if(lastroll > 99.99-profile.minchance)
-						condition = '<';
-				}
 			}
 
 			if (condition == '>')
@@ -918,32 +938,31 @@ function rebet() {
 				target = profile.maxchance;
 
 			//console.log(lowvgap, highvgap, ishighv, target, condition);
-
-			if (profile.mode2) {
-				currpayout = getpayout(profile.maxchance);
-			}
-		}  else {   
-            target = lastroll;
+			currpayout = getpayout(profile.maxchance);
+		} else {   
+			target = lastroll;
 
 			if(condition == '<') {
 				if(lastroll < profile.minchance) {
 					condition = '>';
-       				target = 99.99-profile.maxchance;
-                }
-            } else if (condition == '>') {
+					target = 99.99-profile.maxchance;
+				}
+			} else if (condition == '>') {
 				if(lastroll > 99.99-profile.minchance) {
 					condition = '<';
-                    target = profile.maxchance;
-                }
-            }
+					target = profile.maxchance;
+				}
+			}
 		}
         
 		if (resumetarget) {
-			if (!profile.mode2) {
-				target = resumetarget.target;
-				condition = resumetarget.condition;
-			}
-			losestreakcost -= resumetarget.cost;
+			target = resumetarget.target;
+			condition = resumetarget.condition;
+
+			if (resumetarget.cost > 100000)
+				losestreakcost = resumetarget.cost/4;
+			else
+				losestreakcost = resumetarget.cost;
 
 			resumetarget = null;
 		}
@@ -958,26 +977,22 @@ function rebet() {
 		} else {
 			chance = 99.99-target;
 		}
-                       
-		if (!onswitch && profile.mode2) {
-			mode2chance = chance * 2.0;
-			if (mode2chance >= profile.maxchance)
-				mode2chance = profile.maxchance;
-
+           
+		if (profile.mode2 && mode2zigpaydirup) {
 			chance = getnextmode2chance(chance);
 
 			//console.log(chance, minchance, maxchance);
 			currpayout = getpayout(chance);
-
-			if (condition == '<') {
-				target = chance;
-			} else {
-				target = 99.99-chance;
-			}
 		}
 
         if(chance > profile.maxchance)
             chance = profile.maxchance
+
+		if (condition == '<') {
+			target = chance;
+		} else {
+			target = 99.99-chance;
+		}
         
 		if (vgap.vgap && vgap.vgap.chance > 0) {
 			//console.log(profile.minchance, vgap)
@@ -991,60 +1006,72 @@ function rebet() {
 		var switchlowvgap;
 		var switchhighvgap;
 
-        var gaps = [
-            { chance: vgap.vgap.chance * 1.5, score: vgap.vgap.score+1.5 },
-            { chance: vgap.vgap.chance * 2.0, score: vgap.vgap.score+2.0 },
-            { chance: vgap.vgap.chance * 2.5, score: vgap.vgap.score+2.5 },
-            { chance: vgap.vgap.chance * 3, score: vgap.vgap.score+3.0 },
-            { chance: vgap.vgap.chance * 3.5, score: vgap.vgap.score+3.5 },
-            { chance: vgap.vgap.chance * 4, score: vgap.vgap.score+4.0 },
-        ];
+		var gaps = [
+			{ chance: vgap.vgap.chance * 1.25, score: vgap.vgap.score+1.0 },
+			{ chance: vgap.vgap.chance * 1.5, score: vgap.vgap.score+1.5 },
+			{ chance: vgap.vgap.chance * 2.0, score: vgap.vgap.score+2.0 },
+			{ chance: vgap.vgap.chance * 2.5, score: vgap.vgap.score+2.5 },
+			{ chance: vgap.vgap.chance * 3, score: vgap.vgap.score+3.0 },
+			{ chance: vgap.vgap.chance * 3.5, score: vgap.vgap.score+3.5 },
+			{ chance: vgap.vgap.chance * 4, score: vgap.vgap.score+4.0 },
+			{ chance: vgap.vgap.chance * 6, score: vgap.vgap.score+6.0 },
+		];
 
-        var lgap = { chance: 0, score: 0 };
-        var hgap = { chance: 0, score: 0 };
-            
-            for (var i = gaps.length-1; i >= 0; --i) {
-                var clgap = getlowestgapofscore(lowgaps, betres.nonce, 0.01, gaps[i].chance, gaps[i].score);
-                var chgap = getlowestgapofscore(highgaps, betres.nonce, 0.01, gaps[i].chance, gaps[i].score);
-                if(lgap.score == 0 && clgap.score > 0) {
-                    lgap = clgap;
-                    //console.log(clgap);
-                }
-                if(hgap.score == 0 && chgap.score > 0) {
-                    hgap = chgap;
-                    //console.log(chgap);
-                }
+		var lgap = { chance: 0, score: 0 };
+		var hgap = { chance: 0, score: 0 };
+
+		for (var i = 0; i < gaps.length; ++i) {
+			var high_chance = gaps[i].chance;
+			if (high_chance > profile.maxchance)
+				high_chance = profile.maxchance;
+
+            var clgap = getlowestgapofscore(lowgaps, betres.nonce, 0.01, high_chance, gaps[i].score);
+            var chgap = getlowestgapofscore(highgaps, betres.nonce, 0.01, high_chance, gaps[i].score);
+            if (clgap.score > lgap.score) {
+                lgap = clgap;
+                //console.log(clgap);
             }
-            switchlowvgap = lgap;
-            switchhighvgap = hgap;
+            if(chgap.score > hgap.score) {
+                hgap = chgap;
+                //console.log(chgap);
+            }
+            if (high_chance >= profile.maxchance)
+				break;
+        }
+        switchlowvgap = lgap;
+        switchhighvgap = hgap;
 
-			if (vgap.vgap.score > 0 && (switchlowvgap.score > 0 || switchhighvgap.score > 0)) {
-				if (switchlowvgap.score > switchhighvgap.score)
-					ishighv = false;
-				else
-					ishighv = true;
-			}
-            
 		if (vgap.vgap.score > 0 && 
-                (switchlowvgap.score > vgap.vgap.score ||
-                switchhighvgap.score > vgap.vgap.score)) {
+				(switchlowvgap.score > vgap.vgap.score ||
+				switchhighvgap.score > vgap.vgap.score)) {
+
 			console.log(vgap, switchlowvgap, switchhighvgap)
+
+			if (switchlowvgap.score > switchhighvgap.score)
+				ishighv = false;
+			else
+				ishighv = true;
 
 			if (ishighv) {
 				condition = '>';
 				chance = switchhighvgap.chance;
+				target = 99.99-chance;
 				vgap.islow = false;
 				vgap.vgap = switchhighvgap;
 			} else {
 				condition = '<';
 				chance = switchlowvgap.chance;
+				target = chance;
 				vgap.islow = true;
 				vgap.vgap = switchlowvgap;
 			}
+			resumetarget = { 
+				target: target, condition: condition, cost: losestreakcost
+			};
+   
 			profile.minchance = chance;
 			//console.log(vgap);
-		}
- 
+		} 
 	}
 
 	if (betres.nonce % 250 == 0)
@@ -1062,12 +1089,12 @@ function rebet() {
 		}
 	}
 
-	if (!onswitch && (((lasthighscore.score > 4 && lastlowscore.score > 4) && 
+	if (!onswitch && (((lasthighscore.score > 5 && lastlowscore.score > 5) && 
 				(lowgap.score == 0 || highgap.score == 0)) || 
 				(highgap.chance <= 2.0 && highgap.score > 10) || 
 				(lowgap.chance <= 2.0 && lowgap.score > 10) || 
 				highgap.score > 12.5 || lowgap.score > 12.5)) {
-		var ishigh = highgap.score > lowgap.score;
+		var ishigh = highgap.score >= lowgap.score;
 		var tvar = null;
 		if (ishigh) {
 			tvar = '>' + (99.99-highgap.chance) + '@' + highgap.score + 'x';
@@ -1077,14 +1104,23 @@ function rebet() {
 		console.log('prev_variance: >' + (99.99-lasthighscore.chance) + '@' + lasthighscore.score + 'x' +
 				' <' + lastlowscore.chance + '@' + lastlowscore.score + 'x') + ' curr_variance: ' + tvar;
 
-		var change = prompt('High variance detected, switch to ' + tvar + ' ? ');
-		if (change.length > 0 && change.toLowerCase() === 'y') {
+		if (discord_connected && discord_channel != null) {
+			discord_channel.sendMessage('High variance detected: ' + tvar);
+		}
+
+		if (want_high_variance_prompt || auto_high_variance_switch) {
 			switchscore = highgap.score > lowgap.score ? highgap : lowgap;
 			switchlow = lowgap.score > highgap.score;
+			switchamount = 0;
 
-			var stramount = prompt('Amount: ');
-			if (stramount && Number(stramount) > 0) {
-				switchamount = Number(stramount);
+			if (want_high_variance_prompt) {
+				var change = prompt('High variance detected, switch to ' + tvar + ' ? ');
+				if (change.length > 0 && change.toLowerCase() === 'y') {
+					var stramount = prompt('Amount: ');
+					if (stramount && Number(stramount) > 0) {
+						switchamount = Number(stramount);
+					}
+				}
 			}
 
 			resumetarget = { 
@@ -1120,18 +1156,17 @@ function rebet() {
 				if (lastwon) {
 					var scorebonus = 0;
 					if (vgap.gap) {
-						if (balance > 100000000) {
-							scorebonus = vgap.vgap.score;
-						} else if (balance > 25000000) {
-							scorebonus = vgap.vgap.score*0.75;
-						} else if (balance > 5000000) {
-							scorebonus = vgap.vgap.score*0.5;
+						scorebonus = vgap.vgap.score*0.05;
+						if (balance > 50000) {
+							scorebonus = vgap.vgap.score*0.125;
 						} else if (balance > 100000) {
 							scorebonus = vgap.vgap.score*0.25;
-						} else if (balance > 50000) {
-							scorebonus = vgap.vgap.score*0.125;
-						} else {
-							scorebonus = vgap.vgap.score*0.05;
+						} else if (balance > 1000000) {
+							scorebonus = vgap.vgap.score*0.5;
+						} else if (balance > 10000000) {
+							scorebonus = vgap.vgap.score*0.75;
+						} else if (balance > 100000000) {
+							scorebonus = vgap.vgap.score;
 						}
 					}
 
@@ -1157,27 +1192,14 @@ function rebet() {
                         mode3amount = amount;
                     }
                 }
-			} else {
-                amount = getwagerforprofit(chance, losestreakcost, profile.amount, profile.stepped);
-                if(lastwon)
-                    losestreakcost = Math.ceil(getpayout(chance)/3);
-            }
+			}
 		}
 	} else {
 		amount = profile.amount;
 		if (amount*2 > balance)
 			amount = Math.floor(balance);
 	}
-/*
-    amount = 0;
-    if(lastroll < 0.02 || lastroll > 99.79)
-       process.exit(0);
 
-    needle.post(url + '/bet?' + auth_str, { 
-		amount: amount, target: target, condition: condition 
-	}, bet);
-    return;
-//*/
 	var nextamount = getwagerforprofit(chance, losestreakcost+amount*2, profile.amount, profile.stepped);
 	if (profile.mode2) {
 		nextamount = getwagerforprofit(getnextmode2chance(chance), losestreakcost+amount, profile.amount, profile.stepped);
