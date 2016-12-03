@@ -507,17 +507,6 @@ function betend() {
 	}
 	
 	if (betres != null) {
-		if (discord_connected && discord_channel != null) {
-			var profit = betres.profit+betres.amount-losestreakcost;
-			if (betres.win && profit > announcewinover) {
-				discord_channel.sendMessage('Won ' +
-					(betres.profit/1e8).toFixed(8) +
-					' ' + betres.condition + betres.target + ' ' + betres.roll +
-					' cost ' + ((losestreakcost-betres.amount)/1e8).toFixed(8) +
-					' profit ' + (profit/1e8).toFixed(8));
-			}
-		}
-
 		if (betres.win) {
 			if (losestreak > 0) {
 				losestreak = 0;
