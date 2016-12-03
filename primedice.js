@@ -1045,7 +1045,7 @@ function rebet() {
 				vgap.islow = true;
 				vgap.vgap = switchlowvgap;
 			}
-v   
+
 			profile.minchance = chance;
 			//console.log(vgap);
 		} 
